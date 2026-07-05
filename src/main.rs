@@ -1,4 +1,5 @@
 use std::cmp::min;
+use std::io::Cursor;
 use std::time::{Duration, Instant};
 
 use calloop::timer::{TimeoutAction, Timer};
@@ -8,6 +9,7 @@ use client::globals::registry_queue_init;
 use client::protocol::{wl_keyboard, wl_output, wl_region, wl_seat, wl_shm, wl_surface};
 use client::{Connection, Dispatch, QueueHandle};
 use protocols::ext::background_effect::v1::client::ext_background_effect_surface_v1;
+use rodio::{Decoder as RodioDecoder, DeviceSinkBuilder, MixerDeviceSink, Player};
 use sctk::background_effect::{BackgroundEffectHandler, BackgroundEffectState};
 use sctk::compositor::{CompositorHandler, CompositorState};
 use sctk::output::{OutputHandler, OutputState};
@@ -27,6 +29,7 @@ use sctk::{
 };
 
 const RLE: &[u8] = include_bytes!("../resources/bad_apple.rle");
+const MP3: &[u8] = include_bytes!("../resources/bad_apple.mp3");
 
 struct Decoder<'a> {
     width: u16,
@@ -141,6 +144,9 @@ fn main() {
         decoder,
         frame_num: 0,
         start_time: Instant::now(),
+
+        _audio_sink: None,
+        _audio_player: None,
     };
 
     println!("Q/Escape to quit.");
@@ -174,6 +180,9 @@ struct App {
     decoder: Decoder<'static>,
     frame_num: u32,
     start_time: Instant,
+
+    _audio_sink: Option<MixerDeviceSink>,
+    _audio_player: Option<Player>,
 }
 
 impl App {
@@ -332,10 +341,19 @@ impl WindowHandler for App {
     ) {
         if self.first_configure {
             self.first_configure = false;
-            self.attach_buffer();
-            self.advance_frame();
+
+            let cursor = Cursor::new(MP3);
+            let source = RodioDecoder::new_mp3(cursor).unwrap();
+            let sink = DeviceSinkBuilder::open_default_sink().unwrap();
+            let player = Player::connect_new(&sink.mixer());
+            player.append(source);
+            self._audio_sink = Some(sink);
+            self._audio_player = Some(player);
 
             self.start_time = Instant::now();
+
+            self.attach_buffer();
+            self.advance_frame();
             let frame_time = Duration::from_secs_f64(1. / self.decoder.fps as f64);
             let timer = Timer::from_duration(frame_time);
             self.loop_handle
