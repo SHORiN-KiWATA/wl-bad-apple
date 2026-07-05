@@ -9,7 +9,7 @@ use client::globals::registry_queue_init;
 use client::protocol::{wl_keyboard, wl_output, wl_region, wl_seat, wl_shm, wl_surface};
 use client::{Connection, Dispatch, QueueHandle};
 use protocols::ext::background_effect::v1::client::ext_background_effect_surface_v1;
-use rodio::{Decoder as RodioDecoder, DeviceSinkBuilder, MixerDeviceSink, Player};
+use rodio::{Decoder as RodioDecoder, DeviceSinkBuilder, MixerDeviceSink, Player, Source};
 use sctk::background_effect::{BackgroundEffectHandler, BackgroundEffectState};
 use sctk::compositor::{CompositorHandler, CompositorState};
 use sctk::output::{OutputHandler, OutputState};
@@ -344,6 +344,7 @@ impl WindowHandler for App {
 
             let cursor = Cursor::new(MP3);
             let source = RodioDecoder::new_mp3(cursor).unwrap();
+            let source = source.delay(Duration::from_millis(100));
             let sink = DeviceSinkBuilder::open_default_sink().unwrap();
             let player = Player::connect_new(&sink.mixer());
             player.append(source);
